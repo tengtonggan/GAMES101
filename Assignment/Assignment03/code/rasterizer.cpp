@@ -198,7 +198,7 @@ void rst::rasterizer::draw(std::vector<Triangle *> &TriangleList) {
     for (const auto& t:TriangleList)
     {
         Triangle newtri = *t;
-
+        /*input triangle in world space-->output triangle(newtri) in screen to draw*/
         std::array<Eigen::Vector4f, 3> mm {
                 (view * model * t->v[0]),
                 (view * model * t->v[1]),
@@ -222,7 +222,7 @@ void rst::rasterizer::draw(std::vector<Triangle *> &TriangleList) {
             vec.y()/=vec.w();
             vec.z()/=vec.w();
         }
-
+        //viewspace_normal
         Eigen::Matrix4f inv_trans = (view * model).inverse().transpose();
         Eigen::Vector4f n[] = {
                 inv_trans * to_vec4(t->normal[0], 0.0f),
@@ -235,7 +235,7 @@ void rst::rasterizer::draw(std::vector<Triangle *> &TriangleList) {
         {
             vert.x() = 0.5*width*(vert.x()+1.0);
             vert.y() = 0.5*height*(vert.y()+1.0);
-            vert.z() = -vert.z() * f1 + f2;
+            vert.z() = -vert.z() * f1 + f2;//depth=50(far) when z=-1, depth=0.1(near) when z=1, 
         }
 
         for (int i = 0; i < 3; ++i)
@@ -302,13 +302,28 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
                 if (insideTriangle(x + 0.5, y + 0.5, t.v)) {
                     auto [alpha, beta, gamma] = computeBarycentric2D(x + 0.5, y + 0.5, t.v);
                     float w_reciprocal = 1.0 / (alpha / t.v[0].w() + beta / t.v[1].w() + gamma / t.v[2].w());
+
+                    Eigen::Vector3f interpolated_normal = alpha * t.normal[0] / t.v[0].w() + beta * t.normal[1] / t.v[1].w() + gamma * t.normal[2] / t.v[2].w();
+                    interpolated_normal *= w_reciprocal;
+                    interpolated_normal.normalize();
+
+                    Eigen::Vector3f interpolated_shadingcoords= alpha * view_pos[0] + beta * view_pos[1] + gamma * view_pos[2];
+                    interpolated_shadingcoords *= w_reciprocal;
+
+                    Eigen::Vector2f interpolated_texcoords= alpha * t.tex_coords[0] / t.v[0].w() + beta * t.tex_coords[1] / t.v[1].w() + gamma * t.tex_coords[2] / t.v[2].w();
+                    interpolated_texcoords *= w_reciprocal;
+
                     float z_interpolated = alpha * t.v[0].z() / t.v[0].w() + beta * t.v[1].z() / t.v[1].w() + gamma * t.v[2].z() / t.v[2].w();
-                    z_interpolated *= -w_reciprocal;
+                    z_interpolated *= w_reciprocal;
                     float& z_buffer = depth_buf[(height - 1 - y) * width + x];
-                    if (z_interpolated < depth_buf[(height - 1 - y) * width + x]) {
+                    if (z_interpolated < z_buffer) {
                         z_buffer = z_interpolated;
-                        Eigen::Vector3f point = Eigen::Vector3f(x, y, 1.0f);
-                        //set_pixel(point, t.getColor());
+                        Eigen::Vector2i point = Eigen::Vector2i(x, y);
+                        fragment_shader_payload payload(Eigen::Vector3f::Zero(), interpolated_normal.normalized(), interpolated_texcoords, texture ? &*texture : nullptr);
+                        payload.view_pos = interpolated_shadingcoords;
+                        // Use: Instead of passing the triangle's color directly to the frame buffer, pass the color to the shaders first to get the final color;
+                        auto pixel_color = fragment_shader(payload);
+                        set_pixel(point, pixel_color);
                     }
 
                 }
@@ -411,13 +426,16 @@ rst::rasterizer::rasterizer(int w, int h) : width(w), height(h)
 
 int rst::rasterizer::get_index(int x, int y)
 {
-    return (height-y)*width + x;
+    return (height - 1 - y) * width + x;
 }
 
 void rst::rasterizer::set_pixel(const Vector2i &point, const Eigen::Vector3f &color)
 {
     //old index: auto ind = point.y() + point.x() * width;
-    int ind = (height-point.y())*width + point.x();
+    if (point.x() < 0 || point.x() >= width ||
+        point.y() < 0 || point.y() >= height) return;
+    auto ind = (height - 1 - point.y()) * width + point.x();
+    //auto ind = get_index(point.x(), point.y());
     frame_buf[ind] = color;
 }
 

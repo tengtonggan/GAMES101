@@ -279,7 +279,7 @@ static Eigen::Vector2f interpolate(float alpha, float beta, float gamma, const E
 void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eigen::Vector3f, 3>& view_pos) 
 {
     // TODO: From your HW3, get the triangle rasterization code.
-    //auto v = t.toVector4();
+    auto v = t.toVector4();
     
     // TODO : Find out the bounding box of current triangle.
     // iterate through the pixel and find if the current pixel is inside the triangle
@@ -301,26 +301,22 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
             for (size_t y = box_y1; y <= box_y2; y++) {
                 if (insideTriangle(x + 0.5, y + 0.5, t.v)) {
                     auto [alpha, beta, gamma] = computeBarycentric2D(x + 0.5, y + 0.5, t.v);
-                    float w_reciprocal = 1.0 / (alpha / t.v[0].w() + beta / t.v[1].w() + gamma / t.v[2].w());
-                    //normal
-                    Eigen::Vector3f interpolated_normal = alpha * t.normal[0] / t.v[0].w() + beta * t.normal[1] / t.v[1].w() + gamma * t.normal[2] / t.v[2].w();
-                    interpolated_normal *= w_reciprocal;
-                    interpolated_normal.normalize();
-                    //shadingcoords
-                    Eigen::Vector3f interpolated_shadingcoords= alpha * view_pos[0] / t.v[0].w() + beta * view_pos[1] / t.v[1].w() + gamma * view_pos[2] / t.v[2].w();
-                    interpolated_shadingcoords *= w_reciprocal;
-                    //texcoords
-                    Eigen::Vector2f interpolated_texcoords= alpha * t.tex_coords[0] / t.v[0].w() + beta * t.tex_coords[1] / t.v[1].w() + gamma * t.tex_coords[2] / t.v[2].w();
-                    interpolated_texcoords *= w_reciprocal;
-                    //color-->kd
-                    Eigen::Vector3f interpolated_color = alpha * t.color[0] / t.v[0].w() + beta * t.color[1] / t.v[1].w() + gamma * t.color[2] / t.v[2].w();
-                    interpolated_color *= w_reciprocal;
-
-                    float z_interpolated = alpha * t.v[0].z() / t.v[0].w() + beta * t.v[1].z() / t.v[1].w() + gamma * t.v[2].z() / t.v[2].w();
+                    float w_reciprocal = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                    float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
                     z_interpolated *= w_reciprocal;
                     float& z_buffer = depth_buf[(height - 1 - y) * width + x];
                     if (z_interpolated < z_buffer) {
                         z_buffer = z_interpolated;
+                        //normal
+                        Eigen::Vector3f interpolated_normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1.f);
+                        interpolated_normal.normalize();
+                        //shadingcoords
+                        Eigen::Vector3f interpolated_shadingcoords = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1.f);
+                        //texcoords
+                        Eigen::Vector2f interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1.f);
+                        //color-->kd
+                        Eigen::Vector3f interpolated_color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1.f);
+
                         Eigen::Vector2i point = Eigen::Vector2i(x, y);
                         fragment_shader_payload payload(interpolated_color, interpolated_normal, interpolated_texcoords, texture ? &*texture : nullptr);
                         payload.view_pos = interpolated_shadingcoords;

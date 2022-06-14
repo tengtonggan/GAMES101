@@ -149,38 +149,38 @@ auto to_vec4(const Eigen::Vector3f& v3, float w = 1.0f)
     return Vector4f(v3.x(), v3.y(), v3.z(), w);
 }
 
-//static bool insideTriangle(int x, int y, const Vector4f* _v){
-//    Vector3f v[3];
-//    for(int i=0;i<3;i++)
-//        v[i] = {_v[i].x(),_v[i].y(), 1.0};
-//    Vector3f f0,f1,f2;
-//    f0 = v[1].cross(v[0]);
-//    f1 = v[2].cross(v[1]);
-//    f2 = v[0].cross(v[2]);
-//    Vector3f p(x,y,1.);
-//    if((p.dot(f0)*f0.dot(v[2])>0) && (p.dot(f1)*f1.dot(v[0])>0) && (p.dot(f2)*f2.dot(v[1])>0))
-//        return true;
-//    return false;
-//}
-
-static bool insideTriangle(float x, float y, const Vector4f* _v)//int int origin
-{
-    // TODO : Implement this function to check if the point (x, y) is inside the triangle represented by _v[0], _v[1], _v[2]
-    Eigen::Vector3f p = Eigen::Vector3f(x, y, 0);
-    Eigen::Vector3f v[3] = { Eigen::Vector3f(_v[0].x(), _v[0].y(), 0),
-        Eigen::Vector3f(_v[1].x(), _v[1].y(), 0),Eigen::Vector3f(_v[2].x(), _v[2].y(), 0) };
-    for (size_t i = 0; i < 2; i++) {
-        Eigen::Vector3f vp = p - v[i];
-        Eigen::Vector3f vv = v[(i + 1) % 3] - v[i];
-        auto vs1 = vp.cross(vv);
-        vp = p - v[i + 1];
-        vv = v[(i + 2) % 3] - v[i + 1];
-        auto vs2 = vp.cross(vv);
-        if (vs1.dot(vs2) < 0)
-            return false;
-    }
-    return true;
+static bool insideTriangle(float x, float y, const Vector4f* _v){
+    Vector3f v[3];
+    for(int i=0;i<3;i++)
+        v[i] = {_v[i].x(),_v[i].y(), 1.0};
+    Vector3f f0,f1,f2;
+    f0 = v[1].cross(v[0]);
+    f1 = v[2].cross(v[1]);
+    f2 = v[0].cross(v[2]);
+    Vector3f p(x,y,1.);
+    if((p.dot(f0)*f0.dot(v[2])>0) && (p.dot(f1)*f1.dot(v[0])>0) && (p.dot(f2)*f2.dot(v[1])>0))
+        return true;
+    return false;
 }
+
+//static bool insideTriangle(float x, float y, const Vector4f* _v)//用float x，y会三角形边界会出现缝隙？
+//{
+//    // TODO : Implement this function to check if the point (x, y) is inside the triangle represented by _v[0], _v[1], _v[2]
+//    Eigen::Vector3f p = Eigen::Vector3f(x, y, 0);
+//    Eigen::Vector3f v[3] = { Eigen::Vector3f(_v[0].x(), _v[0].y(), 0),
+//        Eigen::Vector3f(_v[1].x(), _v[1].y(), 0),Eigen::Vector3f(_v[2].x(), _v[2].y(), 0) };
+//    for (size_t i = 0; i < 2; i++) {
+//        Eigen::Vector3f vp = p - v[i];
+//        Eigen::Vector3f vv = v[(i + 1) % 3] - v[i];
+//        auto vs1 = vp.cross(vv);
+//        vp = p - v[i + 1];
+//        vv = v[(i + 2) % 3] - v[i + 1];
+//        auto vs2 = vp.cross(vv);
+//        if (vs1.dot(vs2) < 0)
+//            return false;
+//    }
+//    return true;
+//}
 
 static std::tuple<float, float, float> computeBarycentric2D(float x, float y, const Vector4f* v){
     float c1 = (x*(v[1].y() - v[2].y()) + (v[2].x() - v[1].x())*y + v[1].x()*v[2].y() - v[2].x()*v[1].y()) / (v[0].x()*(v[1].y() - v[2].y()) + (v[2].x() - v[1].x())*v[0].y() + v[1].x()*v[2].y() - v[2].x()*v[1].y());
@@ -255,7 +255,7 @@ void rst::rasterizer::draw(std::vector<Triangle *> &TriangleList) {
         newtri.setColor(2, 148,121.0,92.0);
 
         // Also pass view space vertice position
-        rasterize_triangle(newtri, viewspace_pos);
+        rasterize_triangle(newtri, viewspace_pos, Antialiasing::None);
     }
 }
 
@@ -276,7 +276,7 @@ static Eigen::Vector2f interpolate(float alpha, float beta, float gamma, const E
 }
 
 //Screen space rasterization
-void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eigen::Vector3f, 3>& view_pos) 
+void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eigen::Vector3f, 3>& view_pos, Antialiasing anti)
 {
     // TODO: From your HW3, get the triangle rasterization code.
     auto v = t.toVector4();
@@ -293,8 +293,6 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
         box_x2 = std::max(box_x2, static_cast<int>(t.v[i].x()));
         box_y2 = std::max(box_y2, static_cast<int>(t.v[i].y()));
     }
-
-    rst::Antialiasing anti = rst::Antialiasing::None;
 
     if (anti == rst::Antialiasing::None) {
         for (size_t x = box_x1; x <= box_x2; x++) {
@@ -329,41 +327,60 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
             }
         }
     }
-    //else if (anti == rst::Antialiasing::MSAA) {
-    //    for (size_t x = box_x1; x <= box_x2; x++) {
-    //        for (size_t y = box_y1; y <= box_y2; y++) {
-    //            //super_sampling antialiasing 2*2
-    //            size_t sn = 2;
-    //            float half_gap = 0.5 / sn;
-    //            bool inside = false;
-    //            int sum = 0;
-    //            for (size_t i = 0; i < sn; i++) {
-    //                for (size_t j = 0; j < sn; j++) {
-    //                    //x + 1.0 / sn / 2 + i * 1.0 / sn
-    //                    if (insideTriangle(x + (2 * i + 1) * half_gap, y + (2 * j + 1) * half_gap, t.v)) {
-    //                        inside = true;
-    //                        sum++;
-    //                    }
-    //                }
-    //            }
-    //            if (inside) {
-    //                auto [alpha, beta, gamma] = computeBarycentric2D(x + 0.5, y + 0.5, t.v);
-    //                float w_reciprocal = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-    //                float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-    //                z_interpolated *= w_reciprocal;
-    //                float& z_buffer = depth_buf[(height - 1 - y) * width + x];
-    //                if (z_interpolated < depth_buf[(height - 1 - y) * width + x]) {
-    //                    z_buffer = z_interpolated;
-    //                    Eigen::Vector3f point = Eigen::Vector3f(x, y, 1.0f);
-    //                    float cof = static_cast<float>(sum) / static_cast<float>(sn * sn);
-    //                    //cof = 0.2;
-    //                    set_pixel(point, cof * t.getColor());
-    //                }
-    //            }
-    //        }
-    //    }
-    //    
-    //}
+    else if (anti == rst::Antialiasing::MSAA) {
+        for (size_t x = box_x1; x <= box_x2; x++) {
+            for (size_t y = box_y1; y <= box_y2; y++) {
+                //super_sampling antialiasing 2*2
+                size_t sn = 2;
+                float half_gap = 0.5 / sn;
+                bool inside = false;
+                int sum = 0;
+                for (size_t i = 0; i < sn; i++) {
+                    for (size_t j = 0; j < sn; j++) {
+                        //x + 1.0 / sn / 2 + i * 1.0 / sn
+                        if (insideTriangle(x + (2 * i + 1) * half_gap, y + (2 * j + 1) * half_gap, t.v)) {
+                            inside = true;
+                            sum++;
+                        }
+                    }
+                }
+                /*if (inside == false) {
+                    if (insideTriangle(x + 0.5, y + 0.5, t.v)) {
+                        std::cout << "inside==false but origin center is insided!\n";
+                    }
+                }*/
+                if (inside) {
+                    auto [alpha, beta, gamma] = computeBarycentric2D(x + 0.5, y + 0.5, t.v);
+                    float w_reciprocal = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                    float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                    z_interpolated *= w_reciprocal;
+                    float& z_buffer = depth_buf[(height - 1 - y) * width + x];
+                    if (z_interpolated < depth_buf[(height - 1 - y) * width + x]) {
+                        z_buffer = z_interpolated;
+                        //normal
+                        Eigen::Vector3f interpolated_normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1.f);
+                        interpolated_normal.normalize();
+                        //shadingcoords
+                        Eigen::Vector3f interpolated_shadingcoords = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1.f);
+                        //texcoords
+                        Eigen::Vector2f interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1.f);
+                        //color-->kd
+                        Eigen::Vector3f interpolated_color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1.f);
+
+                        Eigen::Vector2i point = Eigen::Vector2i(x, y);
+                        fragment_shader_payload payload(interpolated_color, interpolated_normal, interpolated_texcoords, texture ? &*texture : nullptr);
+                        payload.view_pos = interpolated_shadingcoords;
+                        // Use: Instead of passing the triangle's color directly to the frame buffer, pass the color to the shaders first to get the final color;
+                        auto pixel_color = fragment_shader(payload);
+                        float cof = static_cast<float>(sum) / static_cast<float>(sn * sn);
+                        //cof = 1.f;
+                        set_pixel(point, cof * pixel_color);
+                    }
+                }
+            }
+        }
+        
+    }
 
     // TODO: Inside your rasterization loop:
     //    * v[i].w() is the vertex view space depth value z.

@@ -101,7 +101,7 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
     {
         // TODO: Get the texture value at the texture coordinates of the current fragment
         if (payload.tex_coords[0] >= 0 && payload.tex_coords[0] <= 1 && payload.tex_coords[1] >= 0 && payload.tex_coords[1] <= 1)
-            return_color = payload.texture->getColor(payload.tex_coords);
+            return_color = payload.texture->getColorBilinear(payload.tex_coords);
         else
             std::cout << "tex_coords error!:" << payload.tex_coords << std::endl;
     }
@@ -328,10 +328,10 @@ int main(int argc, const char** argv)
 
     std::string filename = "output.png";
     objl::Loader Loader;
-    std::string obj_path = "../../models/spot/";
+    std::string obj_path = "../models/spot/";
 
     // Load .obj File
-    bool loadout = Loader.LoadFile("../../models/spot/spot_triangulated_good.obj");
+    bool loadout = Loader.LoadFile("../models/spot/spot_triangulated_good.obj");
     for(auto mesh:Loader.LoadedMeshes)
     {
         //std::cout << mesh.Vertices.size() << std::endl;
@@ -350,10 +350,10 @@ int main(int argc, const char** argv)
 
     rst::rasterizer r(700, 700);
 
-    auto texture_path = "hmap.jpg";
+    auto texture_path = "spot_texture.png";
     r.set_texture(Texture(obj_path + texture_path));
 
-    std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = displacement_fragment_shader;
+    std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = texture_fragment_shader;
     //std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = normal_fragment_shader;
 
     if (argc >= 2)
@@ -439,11 +439,11 @@ int main(int argc, const char** argv)
 
         if (key == 'a' )
         {
-            angle -= 0.1;
+            angle -= 10;
         }
         else if (key == 'd')
         {
-            angle += 0.1;
+            angle +=10;
         }
 
     }

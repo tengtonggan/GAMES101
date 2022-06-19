@@ -7,3 +7,5 @@ GAMES101b站视频链接[->](https://www.bilibili.com/video/BV1X7411F744?spm_id_
 ## Assignment02要点 [笔记链接](Assignment/Assignment02/note.md)
 
 ## Assignment03要点 [笔记链接](Assignment/Assignment03/note.md)
+
+## Assignment04要点 [笔记链接](Assignment/Assignment04/note.md)
